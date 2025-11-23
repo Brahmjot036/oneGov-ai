@@ -51,7 +51,7 @@ export default function LoginForm({ onSuccess }) {
       localStorage.setItem('authToken', data.token)
       localStorage.setItem('user', JSON.stringify(data.user))
 
-      // Redirect to chatbot
+      // Redirect to chat
       if (onSuccess) {
         onSuccess()
       } else {
