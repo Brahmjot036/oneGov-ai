@@ -18,8 +18,16 @@ export async function POST(req) {
 
     const db = getDb();
 
-    // Find user
-    const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email.trim().toLowerCase());
+    // Find user - handle both sync (SQLite) and async (Supabase) databases
+    let user;
+    const userQuery = db.prepare("SELECT * FROM users WHERE email = ?");
+    if (typeof userQuery.get === 'function') {
+      // Sync database (SQLite or in-memory)
+      user = userQuery.get(email.trim().toLowerCase());
+    } else {
+      // Async database (Supabase)
+      user = await userQuery.get(email.trim().toLowerCase());
+    }
     if (!user) {
       console.log("User not found:", email);
       return NextResponse.json(
@@ -46,21 +54,20 @@ export async function POST(req) {
     const token = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
-    // Store session
-    db.prepare(
-      "INSERT INTO sessions (user_id, token, expires_at) VALUES (?, ?, ?)"
-    ).run(user.id, token, expiresAt.toISOString());
+    // Store session - handle both sync and async
+    const sessionInsert = db.prepare("INSERT INTO sessions (user_id, token, expires_at) VALUES (?, ?, ?)");
+    if (typeof sessionInsert.run === 'function') {
+      sessionInsert.run(user.id, token, expiresAt.toISOString());
+    } else {
+      await sessionInsert.run(user.id, token, expiresAt.toISOString());
+    }
 
     // Clean up expired sessions
-    try {
-      db.prepare("DELETE FROM sessions WHERE expires_at < datetime('now')").run();
-    } catch (error) {
-      // For in-memory database, manually clean up expired sessions
-      if (memoryDb && memoryDb.sessions) {
-        memoryDb.sessions = memoryDb.sessions.filter(
-          s => new Date(s.expires_at) > new Date()
-        );
-      }
+    const sessionDelete = db.prepare("DELETE FROM sessions WHERE expires_at < datetime('now')");
+    if (typeof sessionDelete.run === 'function') {
+      sessionDelete.run();
+    } else {
+      await sessionDelete.run();
     }
 
     console.log("Session created for user:", user.id);

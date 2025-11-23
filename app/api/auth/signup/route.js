@@ -24,8 +24,15 @@ export async function POST(req) {
 
     const db = getDb();
 
-    // Check if user already exists
-    const existingUser = db.prepare("SELECT id FROM users WHERE email = ?").get(email.trim().toLowerCase());
+    // Check if user already exists - handle both sync and async
+    const existingUserQuery = db.prepare("SELECT id FROM users WHERE email = ?");
+    let existingUser;
+    if (typeof existingUserQuery.get === 'function') {
+      existingUser = existingUserQuery.get(email.trim().toLowerCase());
+    } else {
+      existingUser = await existingUserQuery.get(email.trim().toLowerCase());
+    }
+    
     if (existingUser) {
       return NextResponse.json(
         { error: "User with this email already exists." },
@@ -37,15 +44,25 @@ export async function POST(req) {
     const hashedPassword = await bcrypt.hash(password, 10);
     console.log("Password hashed successfully");
 
-    // Insert user
-    const result = db
-      .prepare("INSERT INTO users (name, email, password) VALUES (?, ?, ?)")
-      .run(name.trim(), email.trim().toLowerCase(), hashedPassword);
+    // Insert user - handle both sync and async
+    const insertQuery = db.prepare("INSERT INTO users (name, email, password) VALUES (?, ?, ?)");
+    let result;
+    if (typeof insertQuery.run === 'function') {
+      result = insertQuery.run(name.trim(), email.trim().toLowerCase(), hashedPassword);
+    } else {
+      result = await insertQuery.run(name.trim(), email.trim().toLowerCase(), hashedPassword);
+    }
 
     console.log("User created with ID:", result.lastInsertRowid);
 
     // Verify the user was created
-    const newUser = db.prepare("SELECT id, name, email FROM users WHERE id = ?").get(result.lastInsertRowid);
+    const newUserQuery = db.prepare("SELECT id, name, email FROM users WHERE id = ?");
+    let newUser;
+    if (typeof newUserQuery.get === 'function') {
+      newUser = newUserQuery.get(result.lastInsertRowid);
+    } else {
+      newUser = await newUserQuery.get(result.lastInsertRowid);
+    }
     console.log("User data stored:", newUser);
 
     return NextResponse.json(

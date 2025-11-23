@@ -15,8 +15,8 @@ export async function GET(req) {
 
     const db = getDb();
 
-    // Get all chat sessions for the user
-    const sessionsResult = db.prepare(`
+    // Get all chat sessions for the user - handle both sync and async
+    const sessionsQuery = db.prepare(`
       SELECT 
         cs.id,
         cs.title,
@@ -29,7 +29,14 @@ export async function GET(req) {
       WHERE cs.user_id = ?
       ORDER BY cs.updated_at DESC
       LIMIT 50
-    `).all(parseInt(userId));
+    `);
+    
+    let sessionsResult;
+    if (typeof sessionsQuery.all === 'function') {
+      sessionsResult = sessionsQuery.all(parseInt(userId));
+    } else {
+      sessionsResult = await sessionsQuery.all(parseInt(userId));
+    }
     
     // Handle both array and object results
     const sessions = Array.isArray(sessionsResult) ? sessionsResult : (sessionsResult ? [sessionsResult] : []);
@@ -65,13 +72,20 @@ export async function POST(req) {
 
     const db = getDb();
 
-    // Get all messages for a specific session
-    const messages = db.prepare(`
+    // Get all messages for a specific session - handle both sync and async
+    const messagesQuery = db.prepare(`
       SELECT role, content, created_at
       FROM chat_messages
       WHERE session_id = ?
       ORDER BY created_at ASC
-    `).all(parseInt(sessionId));
+    `);
+    
+    let messages;
+    if (typeof messagesQuery.all === 'function') {
+      messages = messagesQuery.all(parseInt(sessionId));
+    } else {
+      messages = await messagesQuery.all(parseInt(sessionId));
+    }
 
     return NextResponse.json({ 
       messages: messages.map(msg => ({

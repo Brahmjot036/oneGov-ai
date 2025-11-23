@@ -14,34 +14,49 @@ export async function POST(req) {
 
     const db = getDb();
 
-    // Create a new chat session
+    // Create a new chat session - handle both sync and async
     const now = new Date().toISOString();
-    const result = db.prepare(`
+    const sessionInsert = db.prepare(`
       INSERT INTO chat_sessions (user_id, title, created_at, updated_at)
       VALUES (?, ?, ?, ?)
-    `).run(parseInt(userId), title, now, now);
+    `);
+    
+    let result;
+    if (typeof sessionInsert.run === 'function') {
+      result = sessionInsert.run(parseInt(userId), title, now, now);
+    } else {
+      result = await sessionInsert.run(parseInt(userId), title, now, now);
+    }
 
     const sessionId = result.lastInsertRowid;
 
-    // Insert all messages
+    // Insert all messages - handle both sync and async
     const insertMessage = db.prepare(`
       INSERT INTO chat_messages (session_id, role, content, created_at)
       VALUES (?, ?, ?, ?)
     `);
 
-    // Handle transaction for both SQLite and in-memory
     const messageNow = new Date().toISOString();
-    if (typeof db.transaction === 'function' && db.transaction.length > 0) {
-      const insertMany = db.transaction((messages) => {
+    
+    // Handle both sync and async databases
+    if (typeof insertMessage.run === 'function') {
+      // Sync database
+      if (typeof db.transaction === 'function') {
+        const insertMany = db.transaction((messages) => {
+          for (const msg of messages) {
+            insertMessage.run(sessionId, msg.role, msg.content, messageNow);
+          }
+        });
+        insertMany(messages);
+      } else {
         for (const msg of messages) {
           insertMessage.run(sessionId, msg.role, msg.content, messageNow);
         }
-      });
-      insertMany(messages);
+      }
     } else {
-      // Fallback for in-memory database
+      // Async database (Supabase)
       for (const msg of messages) {
-        insertMessage.run(sessionId, msg.role, msg.content, messageNow);
+        await insertMessage.run(sessionId, msg.role, msg.content, messageNow);
       }
     }
 

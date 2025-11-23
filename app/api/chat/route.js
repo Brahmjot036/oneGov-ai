@@ -237,17 +237,33 @@ Follow ALL system rules. Respond like a human with clean formatting.
     // Store Q&A pair in database for model training
     try {
       const db = getDb();
-      db.prepare(`
+      const qaInsert = db.prepare(`
         INSERT INTO qa_pairs (user_id, question, answer, persona, state, language, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-      `).run(
-        userId ? parseInt(userId) : null,
-        message,
-        reply,
-        persona || null,
-        state || null,
-        language || 'en'
-      );
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `);
+      
+      const now = new Date().toISOString();
+      if (typeof qaInsert.run === 'function') {
+        qaInsert.run(
+          userId ? parseInt(userId) : null,
+          message,
+          reply,
+          persona || null,
+          state || null,
+          language || 'en',
+          now
+        );
+      } else {
+        await qaInsert.run(
+          userId ? parseInt(userId) : null,
+          message,
+          reply,
+          persona || null,
+          state || null,
+          language || 'en',
+          now
+        );
+      }
     } catch (dbError) {
       console.error("Failed to save Q&A pair:", dbError);
       // Don't fail the request if DB save fails
