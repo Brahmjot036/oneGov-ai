@@ -63,7 +63,7 @@ export default function VoiceRecorder({
   const [isRecording, setIsRecording] = useState(false)
   const [transcription, setTranscription] = useState('')
   const [showTranscription, setShowTranscription] = useState(false)
-  const animationRef = useRef<number>()
+  const animationRef = useRef<number | undefined>(undefined)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
 
   // Get proper language code for speech recognition
