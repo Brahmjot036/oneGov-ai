@@ -28,27 +28,50 @@ export async function POST(req) {
     }
 
     // Find user - handle both sync (SQLite) and async (Supabase) databases
+    const normalizedEmail = email.trim().toLowerCase();
+    console.log("Searching for user with email:", normalizedEmail);
+    
     let user;
     try {
       const userQuery = db.prepare("SELECT * FROM users WHERE email = ?");
       if (typeof userQuery.get === 'function') {
         // Sync database (SQLite or in-memory)
-        user = userQuery.get(email.trim().toLowerCase());
+        user = userQuery.get(normalizedEmail);
       } else {
         // Async database (Supabase)
-        user = await userQuery.get(email.trim().toLowerCase());
+        user = await userQuery.get(normalizedEmail);
       }
     } catch (queryError) {
       console.error("User query error:", queryError);
+      console.error("Query error stack:", queryError.stack);
       return NextResponse.json(
         { error: "Failed to query user. Please try again." },
         { status: 500 }
       );
     }
+    
     if (!user) {
-      console.log("User not found:", email);
+      console.log("User not found for email:", normalizedEmail);
+      // Debug: Log all users in database (for serverless DB debugging)
+      if (process.env.VERCEL || process.env.NEXT_PUBLIC_VERCEL_ENV) {
+        try {
+          // Try to get all users for debugging (only in serverless mode)
+          const allUsersQuery = db.prepare("SELECT id, email FROM users");
+          let allUsers = [];
+          if (typeof allUsersQuery.all === 'function') {
+            allUsers = allUsersQuery.all();
+          }
+          console.log("All users in database:", allUsers);
+          console.log("Database is in-memory (stateless) - data resets between requests on Vercel");
+        } catch (debugError) {
+          console.log("Could not debug users:", debugError.message);
+        }
+      }
       return NextResponse.json(
-        { error: "Invalid email or password." },
+        { 
+          error: "Invalid email or password. Note: If you just signed up, the in-memory database resets between requests. Please set up Supabase for persistent storage.",
+          requiresDatabase: true
+        },
         { status: 401 }
       );
     }
@@ -56,9 +79,17 @@ export async function POST(req) {
     console.log("User found:", { id: user.id, name: user.name, email: user.email });
 
     // Verify password
+    if (!user.password) {
+      console.error("User has no password stored:", user.id);
+      return NextResponse.json(
+        { error: "Invalid email or password." },
+        { status: 401 }
+      );
+    }
+
     const isValid = await bcrypt.compare(password, user.password);
     if (!isValid) {
-      console.log("Invalid password for user:", email);
+      console.log("Invalid password for user:", normalizedEmail);
       return NextResponse.json(
         { error: "Invalid email or password." },
         { status: 401 }
