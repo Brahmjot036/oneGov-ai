@@ -43,9 +43,9 @@ export default function LoginPage() {
 
           {/* Forms */}
           {isLogin ? (
-            <LoginForm onSuccess={() => router.push('/chatbot')} />
+            <LoginForm onSuccess={() => router.push('/chat')} />
           ) : (
-            <SignupForm onSuccess={() => router.push('/chatbot')} />
+            <SignupForm onSuccess={() => router.push('/chat')} />
           )}
         </div>
       </motion.div>

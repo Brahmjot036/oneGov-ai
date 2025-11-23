@@ -88,7 +88,7 @@ export default function SignupForm({ onSuccess }) {
           if (onSuccess) {
             onSuccess()
           } else {
-            router.push('/chatbot')
+            router.push('/chat')
           }
         }, 1500)
       } catch (loginErr) {
