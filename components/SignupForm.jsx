@@ -83,12 +83,12 @@ export default function SignupForm({ onSuccess }) {
         localStorage.setItem('authToken', loginData.token)
         localStorage.setItem('user', JSON.stringify(loginData.user))
 
-        // Redirect to chat after a brief success message
+        // Redirect to chatbot after a brief success message
         setTimeout(() => {
           if (onSuccess) {
             onSuccess()
           } else {
-            router.push('/chat')
+            router.push('/chatbot')
           }
         }, 1500)
       } catch (loginErr) {

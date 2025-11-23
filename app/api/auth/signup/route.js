@@ -96,7 +96,7 @@ export async function POST(req) {
 
     console.log("User created with ID:", result.lastInsertRowid);
 
-    // Verify the user was created
+    // Verify the user was created and retrieve full user data
     let newUser;
     try {
       const newUserQuery = db.prepare("SELECT id, name, email FROM users WHERE id = ?");
@@ -111,14 +111,18 @@ export async function POST(req) {
       
       if (!newUser) {
         // Fallback: use the data we have
-        newUser = { id: result.lastInsertRowid, name: name.trim(), email: normalizedEmail };
+        console.warn("⚠️  User verification returned null, using fallback data");
+        newUser = { id: result.lastInsertRowid, name: normalizedName, email: normalizedEmail };
+      } else {
+        console.log("✅ User verified in database:", { id: newUser.id, name: newUser.name, email: newUser.email });
       }
     } catch (verifyError) {
-      console.error("User verification error:", verifyError);
+      console.error("⚠️  User verification error:", verifyError);
       // Still return success since user was created
-      newUser = { id: result.lastInsertRowid, name: name.trim(), email: normalizedEmail };
+      newUser = { id: result.lastInsertRowid, name: normalizedName, email: normalizedEmail };
     }
-    console.log("User created successfully:", newUser);
+    
+    console.log("✅ Signup completed successfully for user:", newUser);
 
     return NextResponse.json(
       { 

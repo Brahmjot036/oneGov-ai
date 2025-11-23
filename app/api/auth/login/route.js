@@ -140,13 +140,18 @@ export async function POST(req) {
       console.warn("Session cleanup error:", cleanupError);
     }
 
-    console.log("Session created for user:", user.id);
+    console.log("✅ Session created successfully for user:", user.id);
+    console.log("✅ Login successful for:", { id: user.id, name: user.name, email: user.email });
 
     return NextResponse.json(
       {
         message: "Login successful",
         token,
-        user: { id: user.id, name: user.name, email: user.email },
+        user: { 
+          id: user.id, 
+          name: user.name, 
+          email: user.email 
+        },
       },
       { status: 200 }
     );

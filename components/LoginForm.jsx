@@ -47,11 +47,16 @@ export default function LoginForm({ onSuccess }) {
         throw new Error(data.error || 'Login failed')
       }
 
-      // Store token
+      // Store token and user data
       localStorage.setItem('authToken', data.token)
       localStorage.setItem('user', JSON.stringify(data.user))
 
-      onSuccess ? onSuccess() : router.push('/chat')
+      // Redirect to chatbot
+      if (onSuccess) {
+        onSuccess()
+      } else {
+        router.push('/chatbot')
+      }
     } catch (err) {
       setError(err.message)
     } finally {
