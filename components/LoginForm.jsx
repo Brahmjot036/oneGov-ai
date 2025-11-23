@@ -55,7 +55,7 @@ export default function LoginForm({ onSuccess }) {
       if (onSuccess) {
         onSuccess()
       } else {
-        router.push('/chatbot')
+        router.push('/chat')
       }
     } catch (err) {
       setError(err.message)
