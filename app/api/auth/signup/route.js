@@ -61,25 +61,42 @@ export async function POST(req) {
       );
     }
 
-    // Hash password
+    // Hash password with bcrypt
     const hashedPassword = await bcrypt.hash(password, 10);
-    console.log("Password hashed successfully");
+    console.log("✅ Password hashed successfully");
 
-    // Insert user - handle both sync and async
+    // Normalize email and name
+    const normalizedName = name.trim();
+    
+    console.log("📝 Creating user:", { name: normalizedName, email: normalizedEmail });
+
+    // Insert user - handle both sync and async databases
     let result;
     try {
       const insertQuery = db.prepare("INSERT INTO users (name, email, password) VALUES (?, ?, ?)");
-      const insertResult = insertQuery.run(name.trim(), normalizedEmail, hashedPassword);
+      const insertResult = insertQuery.run(normalizedName, normalizedEmail, hashedPassword);
       
       // Check if result is a Promise (async) or direct value (sync)
       if (insertResult && typeof insertResult.then === 'function') {
+        console.log("📡 Using async database (Supabase)");
         result = await insertResult;
       } else {
+        console.log("💾 Using sync database (SQLite/in-memory)");
         result = insertResult;
       }
     } catch (insertError) {
-      console.error("User insert error:", insertError);
-      console.error("Insert error details:", insertError.message);
+      console.error("❌ User insert error:", insertError);
+      console.error("❌ Insert error details:", insertError.message);
+      console.error("❌ Error stack:", insertError.stack);
+      
+      // Check if it's a duplicate email error
+      if (insertError.message && insertError.message.includes('UNIQUE constraint')) {
+        return NextResponse.json(
+          { error: "User with this email already exists." },
+          { status: 400 }
+        );
+      }
+      
       return NextResponse.json(
         { error: insertError.message || "Failed to create user. Please try again." },
         { status: 500 }
@@ -87,14 +104,15 @@ export async function POST(req) {
     }
 
     if (!result || !result.lastInsertRowid) {
-      console.error("User insert failed - no ID returned");
+      console.error("❌ User insert failed - no ID returned");
+      console.error("❌ Result:", result);
       return NextResponse.json(
         { error: "Failed to create user. Please try again." },
         { status: 500 }
       );
     }
 
-    console.log("User created with ID:", result.lastInsertRowid);
+    console.log("✅ User created successfully with ID:", result.lastInsertRowid);
 
     // Verify the user was created and retrieve full user data
     let newUser;
