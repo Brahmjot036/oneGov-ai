@@ -1,13 +1,14 @@
 'use client'
+
+import React from "react";
 import { Message, Language } from '../../types'
 import { Copy, Bookmark, BookmarkCheck, ExternalLink, Shield, Volume2, VolumeX } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 
 // Format markdown-like text for better display
-function formatMarkdown(text: string): JSX.Element {
-  // Split by lines
+function formatMarkdown(text: string): React.ReactNode {
   const lines = text.split('\n');
-  const formatted: (JSX.Element | string)[] = [];
+  const formatted: (React.ReactNode | string)[] = [];
   let key = 0;
 
   lines.forEach((line, index) => {
@@ -62,18 +63,15 @@ function formatMarkdown(text: string): JSX.Element {
     }
     // Regular paragraph
     else if (trimmed.length > 0) {
-      // Check for markdown links [text](url)
       const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
-      const parts: (string | JSX.Element)[] = [];
+      const parts: (string | React.ReactNode)[] = [];
       let lastIndex = 0;
       let match;
       
       while ((match = linkRegex.exec(trimmed)) !== null) {
-        // Add text before link
         if (match.index > lastIndex) {
           parts.push(trimmed.substring(lastIndex, match.index));
         }
-        // Add link
         parts.push(
           <a
             key={`link-${key++}`}
@@ -87,16 +85,14 @@ function formatMarkdown(text: string): JSX.Element {
         );
         lastIndex = match.index + match[0].length;
       }
-      // Add remaining text
       if (lastIndex < trimmed.length) {
         parts.push(trimmed.substring(lastIndex));
       }
       
-      // Replace **bold** with <strong>
-      const processedParts = parts.map((part, idx) => {
+      const processedParts = parts.map((part) => {
         if (typeof part === 'string') {
           const boldRegex = /\*\*([^*]+)\*\*/g;
-          const boldParts: (string | JSX.Element)[] = [];
+          const boldParts: (string | React.ReactNode)[] = [];
           let boldLastIndex = 0;
           let boldMatch;
           
@@ -154,18 +150,16 @@ export default function MessageBubble({ message, onBookmark, onCopy, language = 
     }
     
     return () => {
-      // Cleanup: stop speaking when component unmounts
       if (synthRef.current && synthRef.current.speaking) {
         synthRef.current.cancel()
       }
     }
   }, [])
 
-  // Get proper language code for speech synthesis
   const getSpeechLanguage = (lang: Language): string => {
     const langMap: Record<Language, string> = {
-      'en': 'en-IN', // Indian English for better pronunciation
-      'hi': 'hi-IN', // Hindi (India)
+      'en': 'en-IN',
+      'hi': 'hi-IN',
     }
     return langMap[lang] || 'en-IN'
   }
@@ -174,41 +168,30 @@ export default function MessageBubble({ message, onBookmark, onCopy, language = 
     if (!synthRef.current) return
 
     if (isSpeaking) {
-      // Stop speaking
       synthRef.current.cancel()
       setIsSpeaking(false)
       return
     }
 
-    // Clean text for speech (remove markdown formatting)
     const cleanText = message.content
-      .replace(/\*\*/g, '') // Remove bold markers
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Replace links with text
-      .replace(/###?\s*/g, '') // Remove headers
-      .replace(/^\d+\.\s*/gm, '') // Remove numbered list markers
-      .replace(/^[-•]\s*/gm, '') // Remove bullet points
+      .replace(/\*\*/g, '')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/###?\s*/g, '')
+      .replace(/^\d+\.\s*/gm, '')
+      .replace(/^[-•]\s*/gm, '')
       .trim()
 
     if (!cleanText) return
 
-    // Create utterance
     const utterance = new SpeechSynthesisUtterance(cleanText)
     utterance.lang = getSpeechLanguage(language)
-    utterance.rate = 0.9 // Slightly slower for clarity
+    utterance.rate = 0.9
     utterance.pitch = 1.0
     utterance.volume = 1.0
 
-    utterance.onstart = () => {
-      setIsSpeaking(true)
-    }
-
-    utterance.onend = () => {
-      setIsSpeaking(false)
-    }
-
-    utterance.onerror = () => {
-      setIsSpeaking(false)
-    }
+    utterance.onstart = () => setIsSpeaking(true)
+    utterance.onend = () => setIsSpeaking(false)
+    utterance.onerror = () => setIsSpeaking(false)
 
     utteranceRef.current = utterance
     synthRef.current.speak(utterance)
@@ -243,7 +226,6 @@ export default function MessageBubble({ message, onBookmark, onCopy, language = 
               : 'bg-white border border-gray-200 rounded-bl-sm shadow-sm'
           }`}
         >
-          {/* Verified Source Badge */}
           {!isUser && message.sources && message.sources.length > 0 && (
             <div className="mb-3 flex items-center gap-2">
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-50 border border-green-200 rounded-full">
@@ -265,16 +247,14 @@ export default function MessageBubble({ message, onBookmark, onCopy, language = 
             style={!isUser ? {
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
               lineHeight: '1.6',
-              color: '#111827', // Ensure black text
+              color: '#111827',
             } : {}}
           >
             {!isUser ? formatMarkdown(message.content) : message.content}
           </div>
 
-          {/* Metadata for all messages */}
           {(message.sources || message.confidence || message.lastUpdated) && (
             <div className={`mt-3 pt-3 border-t ${isUser ? 'border-white/20' : 'border-gray-200'} space-y-2`}>
-              {/* Sources */}
               {message.sources && message.sources.length > 0 && (
                 <div className="space-y-1">
                   <p className={`text-xs font-semibold mb-2 ${isUser ? 'text-white/90' : 'text-gray-700'}`}>
@@ -303,7 +283,6 @@ export default function MessageBubble({ message, onBookmark, onCopy, language = 
                 </div>
               )}
 
-              {/* Confidence & Last Updated */}
               {(message.confidence || message.lastUpdated) && (
                 <div className={`flex items-center gap-3 text-xs ${isUser ? 'text-white/80' : 'text-gray-700'}`}>
                   {message.confidence && (
@@ -315,7 +294,6 @@ export default function MessageBubble({ message, onBookmark, onCopy, language = 
             </div>
           )}
 
-          {/* Actions for assistant messages */}
           {!isUser && (
             <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-200">
               <button
@@ -325,7 +303,6 @@ export default function MessageBubble({ message, onBookmark, onCopy, language = 
                     ? 'text-[#004AAD] hover:text-[#003080]'
                     : 'text-gray-800 hover:text-[#004AAD]'
                 }`}
-                title={isSpeaking ? 'Stop speaking' : 'Speak message'}
               >
                 {isSpeaking ? (
                   <VolumeX className="w-3 h-3" />
@@ -334,14 +311,15 @@ export default function MessageBubble({ message, onBookmark, onCopy, language = 
                 )}
                 {isSpeaking ? 'Stop' : 'Speak'}
               </button>
+
               <button
                 onClick={handleCopy}
                 className="flex items-center gap-1 text-xs text-gray-800 hover:text-[#004AAD] transition-colors"
-                title="Copy message"
               >
                 <Copy className="w-3 h-3" />
                 {copied ? 'Copied!' : 'Copy'}
               </button>
+
               <button
                 onClick={handleBookmark}
                 className={`flex items-center gap-1 text-xs transition-colors ${
@@ -349,7 +327,6 @@ export default function MessageBubble({ message, onBookmark, onCopy, language = 
                     ? 'text-[#FFB300] hover:text-[#FFB300]'
                     : 'text-gray-800 hover:text-[#FFB300]'
                 }`}
-                title="Bookmark message"
               >
                 {isBookmarked ? (
                   <BookmarkCheck className="w-3 h-3" />
@@ -361,6 +338,7 @@ export default function MessageBubble({ message, onBookmark, onCopy, language = 
             </div>
           )}
         </div>
+
         {message.timestamp && (
           <span className={`text-xs mt-1 block ${isUser ? 'text-white/70' : 'text-gray-600'}`}>
             {new Date(message.timestamp).toLocaleTimeString()}
@@ -370,4 +348,3 @@ export default function MessageBubble({ message, onBookmark, onCopy, language = 
     </div>
   )
 }
-

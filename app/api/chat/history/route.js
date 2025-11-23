@@ -16,7 +16,7 @@ export async function GET(req) {
     const db = getDb();
 
     // Get all chat sessions for the user
-    const sessions = db.prepare(`
+    const sessionsResult = db.prepare(`
       SELECT 
         cs.id,
         cs.title,
@@ -30,6 +30,9 @@ export async function GET(req) {
       ORDER BY cs.updated_at DESC
       LIMIT 50
     `).all(parseInt(userId));
+    
+    // Handle both array and object results
+    const sessions = Array.isArray(sessionsResult) ? sessionsResult : (sessionsResult ? [sessionsResult] : []);
 
     return NextResponse.json({ 
       history: sessions.map(session => ({

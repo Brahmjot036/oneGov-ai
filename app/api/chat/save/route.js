@@ -28,13 +28,20 @@ export async function POST(req) {
       VALUES (?, ?, ?, datetime('now'))
     `);
 
-    const insertMany = db.transaction((messages) => {
+    // Handle transaction for both SQLite and in-memory
+    if (typeof db.transaction === 'function') {
+      const insertMany = db.transaction((messages) => {
+        for (const msg of messages) {
+          insertMessage.run(sessionId, msg.role, msg.content);
+        }
+      });
+      insertMany(messages);
+    } else {
+      // Fallback for in-memory database
       for (const msg of messages) {
         insertMessage.run(sessionId, msg.role, msg.content);
       }
-    });
-
-    insertMany(messages);
+    }
 
     return NextResponse.json({ 
       success: true,
