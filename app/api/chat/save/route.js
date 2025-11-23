@@ -15,31 +15,33 @@ export async function POST(req) {
     const db = getDb();
 
     // Create a new chat session
+    const now = new Date().toISOString();
     const result = db.prepare(`
       INSERT INTO chat_sessions (user_id, title, created_at, updated_at)
-      VALUES (?, ?, datetime('now'), datetime('now'))
-    `).run(parseInt(userId), title);
+      VALUES (?, ?, ?, ?)
+    `).run(parseInt(userId), title, now, now);
 
     const sessionId = result.lastInsertRowid;
 
     // Insert all messages
     const insertMessage = db.prepare(`
       INSERT INTO chat_messages (session_id, role, content, created_at)
-      VALUES (?, ?, ?, datetime('now'))
+      VALUES (?, ?, ?, ?)
     `);
 
     // Handle transaction for both SQLite and in-memory
-    if (typeof db.transaction === 'function') {
+    const messageNow = new Date().toISOString();
+    if (typeof db.transaction === 'function' && db.transaction.length > 0) {
       const insertMany = db.transaction((messages) => {
         for (const msg of messages) {
-          insertMessage.run(sessionId, msg.role, msg.content);
+          insertMessage.run(sessionId, msg.role, msg.content, messageNow);
         }
       });
       insertMany(messages);
     } else {
       // Fallback for in-memory database
       for (const msg of messages) {
-        insertMessage.run(sessionId, msg.role, msg.content);
+        insertMessage.run(sessionId, msg.role, msg.content, messageNow);
       }
     }
 
