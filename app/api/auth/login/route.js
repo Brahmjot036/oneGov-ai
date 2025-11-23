@@ -29,7 +29,7 @@ export async function POST(req) {
 
     // Find user - handle both sync (SQLite) and async (Supabase) databases
     const normalizedEmail = email.trim().toLowerCase();
-    console.log("Searching for user with email:", normalizedEmail);
+    console.log("🔍 Searching for user with email:", normalizedEmail);
     
     let user;
     try {
@@ -39,14 +39,18 @@ export async function POST(req) {
       // Check if result is a Promise (async) or direct value (sync)
       if (queryResult && typeof queryResult.then === 'function') {
         // Async database (Supabase)
+        console.log("📡 Using async database (Supabase)");
         user = await queryResult;
       } else {
         // Sync database (SQLite or in-memory)
+        console.log("💾 Using sync database (SQLite/in-memory)");
         user = queryResult;
       }
+      
+      console.log("👤 Query result:", user ? `User found (ID: ${user.id})` : "User not found");
     } catch (queryError) {
-      console.error("User query error:", queryError);
-      console.error("Query error stack:", queryError.stack);
+      console.error("❌ User query error:", queryError);
+      console.error("❌ Query error stack:", queryError.stack);
       return NextResponse.json(
         { error: "Failed to query user. Please try again." },
         { status: 500 }
