@@ -1,9 +1,11 @@
 'use client'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Loader2 } from 'lucide-react'
 
 export default function SignupForm({ onSuccess }) {
+  const router = useRouter()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -40,25 +42,68 @@ export default function SignupForm({ onSuccess }) {
     setLoading(true)
 
     try {
-      const res = await fetch('/api/auth/signup', {
+      // Step 1: Create account
+      const signupRes = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, password }),
       })
 
-      const data = await res.json()
+      const signupData = await signupRes.json()
 
-      if (!res.ok) {
-        throw new Error(data.error || 'Signup failed')
+      if (!signupRes.ok) {
+        throw new Error(signupData.error || 'Signup failed')
       }
 
+      // Step 2: Auto-login after successful signup
       setSuccess(true)
-      setTimeout(() => {
-        onSuccess()
-      }, 1500)
+      
+      try {
+        const loginRes = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        })
+
+        const loginData = await loginRes.json()
+
+        if (!loginRes.ok) {
+          // If auto-login fails, show success but ask user to login manually
+          setTimeout(() => {
+            if (onSuccess) {
+              onSuccess()
+            } else {
+              router.push('/login')
+            }
+          }, 2000)
+          return
+        }
+
+        // Store token and user data
+        localStorage.setItem('authToken', loginData.token)
+        localStorage.setItem('user', JSON.stringify(loginData.user))
+
+        // Redirect to chat after a brief success message
+        setTimeout(() => {
+          if (onSuccess) {
+            onSuccess()
+          } else {
+            router.push('/chat')
+          }
+        }, 1500)
+      } catch (loginErr) {
+        // If auto-login fails, still show success and redirect to login page
+        console.error('Auto-login failed:', loginErr)
+        setTimeout(() => {
+          if (onSuccess) {
+            onSuccess()
+          } else {
+            router.push('/login')
+          }
+        }, 2000)
+      }
     } catch (err) {
       setError(err.message)
-    } finally {
       setLoading(false)
     }
   }
@@ -76,7 +121,8 @@ export default function SignupForm({ onSuccess }) {
           </svg>
         </div>
         <h3 className="text-xl font-bold text-[#004AAD] mb-2">Account Created!</h3>
-        <p className="text-gray-800">Please login to continue</p>
+        <p className="text-gray-800 mb-4">Logging you in...</p>
+        <Loader2 className="w-6 h-6 animate-spin text-[#004AAD] mx-auto" />
       </motion.div>
     )
   }

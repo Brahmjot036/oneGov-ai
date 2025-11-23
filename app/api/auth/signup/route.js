@@ -34,13 +34,17 @@ export async function POST(req) {
     }
 
     // Check if user already exists - handle both sync and async
+    const normalizedEmail = email.trim().toLowerCase();
     let existingUser;
     try {
       const existingUserQuery = db.prepare("SELECT id FROM users WHERE email = ?");
-      if (typeof existingUserQuery.get === 'function') {
-        existingUser = existingUserQuery.get(email.trim().toLowerCase());
+      const queryResult = existingUserQuery.get(normalizedEmail);
+      
+      // Check if result is a Promise (async) or direct value (sync)
+      if (queryResult && typeof queryResult.then === 'function') {
+        existingUser = await queryResult;
       } else {
-        existingUser = await existingUserQuery.get(email.trim().toLowerCase());
+        existingUser = queryResult;
       }
     } catch (queryError) {
       console.error("User query error:", queryError);
@@ -65,13 +69,17 @@ export async function POST(req) {
     let result;
     try {
       const insertQuery = db.prepare("INSERT INTO users (name, email, password) VALUES (?, ?, ?)");
-      if (typeof insertQuery.run === 'function') {
-        result = insertQuery.run(name.trim(), email.trim().toLowerCase(), hashedPassword);
+      const insertResult = insertQuery.run(name.trim(), normalizedEmail, hashedPassword);
+      
+      // Check if result is a Promise (async) or direct value (sync)
+      if (insertResult && typeof insertResult.then === 'function') {
+        result = await insertResult;
       } else {
-        result = await insertQuery.run(name.trim(), email.trim().toLowerCase(), hashedPassword);
+        result = insertResult;
       }
     } catch (insertError) {
       console.error("User insert error:", insertError);
+      console.error("Insert error details:", insertError.message);
       return NextResponse.json(
         { error: insertError.message || "Failed to create user. Please try again." },
         { status: 500 }
@@ -92,17 +100,25 @@ export async function POST(req) {
     let newUser;
     try {
       const newUserQuery = db.prepare("SELECT id, name, email FROM users WHERE id = ?");
-      if (typeof newUserQuery.get === 'function') {
-        newUser = newUserQuery.get(result.lastInsertRowid);
+      const verifyResult = newUserQuery.get(result.lastInsertRowid);
+      
+      // Check if result is a Promise (async) or direct value (sync)
+      if (verifyResult && typeof verifyResult.then === 'function') {
+        newUser = await verifyResult;
       } else {
-        newUser = await newUserQuery.get(result.lastInsertRowid);
+        newUser = verifyResult;
+      }
+      
+      if (!newUser) {
+        // Fallback: use the data we have
+        newUser = { id: result.lastInsertRowid, name: name.trim(), email: normalizedEmail };
       }
     } catch (verifyError) {
       console.error("User verification error:", verifyError);
       // Still return success since user was created
-      newUser = { id: result.lastInsertRowid, name: name.trim(), email: email.trim().toLowerCase() };
+      newUser = { id: result.lastInsertRowid, name: name.trim(), email: normalizedEmail };
     }
-    console.log("User data stored:", newUser);
+    console.log("User created successfully:", newUser);
 
     return NextResponse.json(
       { 

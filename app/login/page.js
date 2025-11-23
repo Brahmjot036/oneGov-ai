@@ -45,10 +45,7 @@ export default function LoginPage() {
           {isLogin ? (
             <LoginForm onSuccess={() => router.push('/chat')} />
           ) : (
-            <SignupForm onSuccess={() => {
-              setIsLogin(true)
-              // Show success message
-            }} />
+            <SignupForm onSuccess={() => router.push('/chat')} />
           )}
         </div>
       </motion.div>
