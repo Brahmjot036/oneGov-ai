@@ -22,16 +22,32 @@ export async function POST(req) {
       );
     }
 
-    const db = getDb();
+    let db;
+    try {
+      db = getDb();
+    } catch (dbError) {
+      console.error("Database initialization error:", dbError);
+      return NextResponse.json(
+        { error: "Database initialization failed. Please try again." },
+        { status: 500 }
+      );
+    }
 
     // Check if user already exists - handle both sync and async
-    const existingUserQuery = db.prepare("SELECT id FROM users WHERE email = ?");
-    const existingUserResult = existingUserQuery.get(email.trim().toLowerCase());
     let existingUser;
-    if (existingUserResult && typeof existingUserResult.then === 'function') {
-      existingUser = await existingUserResult;
-    } else {
-      existingUser = existingUserResult;
+    try {
+      const existingUserQuery = db.prepare("SELECT id FROM users WHERE email = ?");
+      if (typeof existingUserQuery.get === 'function') {
+        existingUser = existingUserQuery.get(email.trim().toLowerCase());
+      } else {
+        existingUser = await existingUserQuery.get(email.trim().toLowerCase());
+      }
+    } catch (queryError) {
+      console.error("User query error:", queryError);
+      return NextResponse.json(
+        { error: "Failed to check existing user. Please try again." },
+        { status: 500 }
+      );
     }
     
     if (existingUser) {
@@ -46,25 +62,45 @@ export async function POST(req) {
     console.log("Password hashed successfully");
 
     // Insert user - handle both sync and async
-    const insertQuery = db.prepare("INSERT INTO users (name, email, password) VALUES (?, ?, ?)");
-    const insertResult = insertQuery.run(name.trim(), email.trim().toLowerCase(), hashedPassword);
     let result;
-    if (insertResult && typeof insertResult.then === 'function') {
-      result = await insertResult;
-    } else {
-      result = insertResult;
+    try {
+      const insertQuery = db.prepare("INSERT INTO users (name, email, password) VALUES (?, ?, ?)");
+      if (typeof insertQuery.run === 'function') {
+        result = insertQuery.run(name.trim(), email.trim().toLowerCase(), hashedPassword);
+      } else {
+        result = await insertQuery.run(name.trim(), email.trim().toLowerCase(), hashedPassword);
+      }
+    } catch (insertError) {
+      console.error("User insert error:", insertError);
+      return NextResponse.json(
+        { error: insertError.message || "Failed to create user. Please try again." },
+        { status: 500 }
+      );
     }
 
-    console.log("User created with ID:", result?.lastInsertRowid);
+    if (!result || !result.lastInsertRowid) {
+      console.error("User insert failed - no ID returned");
+      return NextResponse.json(
+        { error: "Failed to create user. Please try again." },
+        { status: 500 }
+      );
+    }
+
+    console.log("User created with ID:", result.lastInsertRowid);
 
     // Verify the user was created
-    const newUserQuery = db.prepare("SELECT id, name, email FROM users WHERE id = ?");
-    const newUserResult = newUserQuery.get(result?.lastInsertRowid);
     let newUser;
-    if (newUserResult && typeof newUserResult.then === 'function') {
-      newUser = await newUserResult;
-    } else {
-      newUser = newUserResult;
+    try {
+      const newUserQuery = db.prepare("SELECT id, name, email FROM users WHERE id = ?");
+      if (typeof newUserQuery.get === 'function') {
+        newUser = newUserQuery.get(result.lastInsertRowid);
+      } else {
+        newUser = await newUserQuery.get(result.lastInsertRowid);
+      }
+    } catch (verifyError) {
+      console.error("User verification error:", verifyError);
+      // Still return success since user was created
+      newUser = { id: result.lastInsertRowid, name: name.trim(), email: email.trim().toLowerCase() };
     }
     console.log("User data stored:", newUser);
 

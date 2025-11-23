@@ -243,18 +243,26 @@ Follow ALL system rules. Respond like a human with clean formatting.
       `);
       
       const now = new Date().toISOString();
-      const qaResult = qaInsert.run(
-        userId ? parseInt(userId) : null,
-        message,
-        reply,
-        persona || null,
-        state || null,
-        language || 'en',
-        now
-      );
-      
-      if (qaResult && typeof qaResult.then === 'function') {
-        await qaResult;
+      if (typeof qaInsert.run === 'function') {
+        qaInsert.run(
+          userId ? parseInt(userId) : null,
+          message,
+          reply,
+          persona || null,
+          state || null,
+          language || 'en',
+          now
+        );
+      } else {
+        await qaInsert.run(
+          userId ? parseInt(userId) : null,
+          message,
+          reply,
+          persona || null,
+          state || null,
+          language || 'en',
+          now
+        );
       }
     } catch (dbError) {
       console.error("Failed to save Q&A pair:", dbError);

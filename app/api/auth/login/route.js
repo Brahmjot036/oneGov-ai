@@ -16,19 +16,34 @@ export async function POST(req) {
       );
     }
 
-    const db = getDb();
+    let db;
+    try {
+      db = getDb();
+    } catch (dbError) {
+      console.error("Database initialization error:", dbError);
+      return NextResponse.json(
+        { error: "Database initialization failed. Please try again." },
+        { status: 500 }
+      );
+    }
 
     // Find user - handle both sync (SQLite) and async (Supabase) databases
     let user;
-    const userQuery = db.prepare("SELECT * FROM users WHERE email = ?");
-    const result = userQuery.get(email.trim().toLowerCase());
-    // Check if result is a Promise (async) or direct value (sync)
-    if (result && typeof result.then === 'function') {
-      // Async database (Supabase)
-      user = await result;
-    } else {
-      // Sync database (SQLite or in-memory)
-      user = result;
+    try {
+      const userQuery = db.prepare("SELECT * FROM users WHERE email = ?");
+      if (typeof userQuery.get === 'function') {
+        // Sync database (SQLite or in-memory)
+        user = userQuery.get(email.trim().toLowerCase());
+      } else {
+        // Async database (Supabase)
+        user = await userQuery.get(email.trim().toLowerCase());
+      }
+    } catch (queryError) {
+      console.error("User query error:", queryError);
+      return NextResponse.json(
+        { error: "Failed to query user. Please try again." },
+        { status: 500 }
+      );
     }
     if (!user) {
       console.log("User not found:", email);
@@ -58,16 +73,18 @@ export async function POST(req) {
 
     // Store session - handle both sync and async
     const sessionInsert = db.prepare("INSERT INTO sessions (user_id, token, expires_at) VALUES (?, ?, ?)");
-    const sessionResult = sessionInsert.run(user.id, token, expiresAt.toISOString());
-    if (sessionResult && typeof sessionResult.then === 'function') {
-      await sessionResult;
+    if (typeof sessionInsert.run === 'function') {
+      sessionInsert.run(user.id, token, expiresAt.toISOString());
+    } else {
+      await sessionInsert.run(user.id, token, expiresAt.toISOString());
     }
 
     // Clean up expired sessions
     const sessionDelete = db.prepare("DELETE FROM sessions WHERE expires_at < datetime('now')");
-    const deleteResult = sessionDelete.run();
-    if (deleteResult && typeof deleteResult.then === 'function') {
-      await deleteResult;
+    if (typeof sessionDelete.run === 'function') {
+      sessionDelete.run();
+    } else {
+      await sessionDelete.run();
     }
 
     console.log("Session created for user:", user.id);
