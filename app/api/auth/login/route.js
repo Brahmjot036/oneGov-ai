@@ -67,10 +67,15 @@ export async function POST(req) {
           console.log("Could not debug users:", debugError.message);
         }
       }
+      // Check if we're using in-memory database
+      const isUsingInMemory = process.env.VERCEL && !process.env.NEXT_PUBLIC_SUPABASE_URL;
+      
       return NextResponse.json(
         { 
-          error: "Invalid email or password. Note: If you just signed up, the in-memory database resets between requests. Please set up Supabase for persistent storage.",
-          requiresDatabase: true
+          error: isUsingInMemory 
+            ? "Invalid email or password. The app is using an in-memory database that resets between requests. Please set up Supabase and add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables in Vercel, then redeploy."
+            : "Invalid email or password.",
+          requiresDatabase: isUsingInMemory
         },
         { status: 401 }
       );
