@@ -21,12 +21,14 @@ export async function POST(req) {
     // Find user - handle both sync (SQLite) and async (Supabase) databases
     let user;
     const userQuery = db.prepare("SELECT * FROM users WHERE email = ?");
-    if (typeof userQuery.get === 'function') {
-      // Sync database (SQLite or in-memory)
-      user = userQuery.get(email.trim().toLowerCase());
-    } else {
+    const result = userQuery.get(email.trim().toLowerCase());
+    // Check if result is a Promise (async) or direct value (sync)
+    if (result && typeof result.then === 'function') {
       // Async database (Supabase)
-      user = await userQuery.get(email.trim().toLowerCase());
+      user = await result;
+    } else {
+      // Sync database (SQLite or in-memory)
+      user = result;
     }
     if (!user) {
       console.log("User not found:", email);
@@ -56,18 +58,16 @@ export async function POST(req) {
 
     // Store session - handle both sync and async
     const sessionInsert = db.prepare("INSERT INTO sessions (user_id, token, expires_at) VALUES (?, ?, ?)");
-    if (typeof sessionInsert.run === 'function') {
-      sessionInsert.run(user.id, token, expiresAt.toISOString());
-    } else {
-      await sessionInsert.run(user.id, token, expiresAt.toISOString());
+    const sessionResult = sessionInsert.run(user.id, token, expiresAt.toISOString());
+    if (sessionResult && typeof sessionResult.then === 'function') {
+      await sessionResult;
     }
 
     // Clean up expired sessions
     const sessionDelete = db.prepare("DELETE FROM sessions WHERE expires_at < datetime('now')");
-    if (typeof sessionDelete.run === 'function') {
-      sessionDelete.run();
-    } else {
-      await sessionDelete.run();
+    const deleteResult = sessionDelete.run();
+    if (deleteResult && typeof deleteResult.then === 'function') {
+      await deleteResult;
     }
 
     console.log("Session created for user:", user.id);

@@ -26,11 +26,12 @@ export async function POST(req) {
 
     // Check if user already exists - handle both sync and async
     const existingUserQuery = db.prepare("SELECT id FROM users WHERE email = ?");
+    const existingUserResult = existingUserQuery.get(email.trim().toLowerCase());
     let existingUser;
-    if (typeof existingUserQuery.get === 'function') {
-      existingUser = existingUserQuery.get(email.trim().toLowerCase());
+    if (existingUserResult && typeof existingUserResult.then === 'function') {
+      existingUser = await existingUserResult;
     } else {
-      existingUser = await existingUserQuery.get(email.trim().toLowerCase());
+      existingUser = existingUserResult;
     }
     
     if (existingUser) {
@@ -46,22 +47,24 @@ export async function POST(req) {
 
     // Insert user - handle both sync and async
     const insertQuery = db.prepare("INSERT INTO users (name, email, password) VALUES (?, ?, ?)");
+    const insertResult = insertQuery.run(name.trim(), email.trim().toLowerCase(), hashedPassword);
     let result;
-    if (typeof insertQuery.run === 'function') {
-      result = insertQuery.run(name.trim(), email.trim().toLowerCase(), hashedPassword);
+    if (insertResult && typeof insertResult.then === 'function') {
+      result = await insertResult;
     } else {
-      result = await insertQuery.run(name.trim(), email.trim().toLowerCase(), hashedPassword);
+      result = insertResult;
     }
 
-    console.log("User created with ID:", result.lastInsertRowid);
+    console.log("User created with ID:", result?.lastInsertRowid);
 
     // Verify the user was created
     const newUserQuery = db.prepare("SELECT id, name, email FROM users WHERE id = ?");
+    const newUserResult = newUserQuery.get(result?.lastInsertRowid);
     let newUser;
-    if (typeof newUserQuery.get === 'function') {
-      newUser = newUserQuery.get(result.lastInsertRowid);
+    if (newUserResult && typeof newUserResult.then === 'function') {
+      newUser = await newUserResult;
     } else {
-      newUser = await newUserQuery.get(result.lastInsertRowid);
+      newUser = newUserResult;
     }
     console.log("User data stored:", newUser);
 

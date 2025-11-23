@@ -21,14 +21,19 @@ export async function POST(req) {
       VALUES (?, ?, ?, ?)
     `);
     
+    const sessionResult = sessionInsert.run(parseInt(userId), title, now, now);
     let result;
-    if (typeof sessionInsert.run === 'function') {
-      result = sessionInsert.run(parseInt(userId), title, now, now);
+    if (sessionResult && typeof sessionResult.then === 'function') {
+      result = await sessionResult;
     } else {
-      result = await sessionInsert.run(parseInt(userId), title, now, now);
+      result = sessionResult;
     }
 
-    const sessionId = result.lastInsertRowid;
+    const sessionId = result?.lastInsertRowid;
+
+    if (!sessionId) {
+      throw new Error('Failed to create chat session');
+    }
 
     // Insert all messages - handle both sync and async
     const insertMessage = db.prepare(`
@@ -39,11 +44,19 @@ export async function POST(req) {
     const messageNow = new Date().toISOString();
     
     // Handle both sync and async databases
-    if (typeof insertMessage.run === 'function') {
+    const firstMessageResult = insertMessage.run(sessionId, messages[0]?.role, messages[0]?.content, messageNow);
+    const isAsync = firstMessageResult && typeof firstMessageResult.then === 'function';
+    
+    if (isAsync) {
+      // Async database (Supabase)
+      for (const msg of messages) {
+        await insertMessage.run(sessionId, msg.role, msg.content, messageNow);
+      }
+    } else {
       // Sync database
       if (typeof db.transaction === 'function') {
-        const insertMany = db.transaction((messages) => {
-          for (const msg of messages) {
+        const insertMany = db.transaction((msgs) => {
+          for (const msg of msgs) {
             insertMessage.run(sessionId, msg.role, msg.content, messageNow);
           }
         });
@@ -52,11 +65,6 @@ export async function POST(req) {
         for (const msg of messages) {
           insertMessage.run(sessionId, msg.role, msg.content, messageNow);
         }
-      }
-    } else {
-      // Async database (Supabase)
-      for (const msg of messages) {
-        await insertMessage.run(sessionId, msg.role, msg.content, messageNow);
       }
     }
 

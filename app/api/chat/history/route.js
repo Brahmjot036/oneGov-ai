@@ -31,11 +31,12 @@ export async function GET(req) {
       LIMIT 50
     `);
     
+    const sessionsResultPromise = sessionsQuery.all(parseInt(userId));
     let sessionsResult;
-    if (typeof sessionsQuery.all === 'function') {
-      sessionsResult = sessionsQuery.all(parseInt(userId));
+    if (sessionsResultPromise && typeof sessionsResultPromise.then === 'function') {
+      sessionsResult = await sessionsResultPromise;
     } else {
-      sessionsResult = await sessionsQuery.all(parseInt(userId));
+      sessionsResult = sessionsResultPromise;
     }
     
     // Handle both array and object results
@@ -80,11 +81,12 @@ export async function POST(req) {
       ORDER BY created_at ASC
     `);
     
+    const messagesPromise = messagesQuery.all(parseInt(sessionId));
     let messages;
-    if (typeof messagesQuery.all === 'function') {
-      messages = messagesQuery.all(parseInt(sessionId));
+    if (messagesPromise && typeof messagesPromise.then === 'function') {
+      messages = await messagesPromise;
     } else {
-      messages = await messagesQuery.all(parseInt(sessionId));
+      messages = messagesPromise;
     }
 
     return NextResponse.json({ 

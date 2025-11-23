@@ -14,47 +14,53 @@ export async function POST(req) {
     // Find session - handle both sync and async databases
     let session;
     try {
+      // Try JOIN query first (works for SQLite)
       const sessionQuery = db.prepare(
         "SELECT s.*, u.name, u.email FROM sessions s JOIN users u ON s.user_id = u.id WHERE s.token = ? AND s.expires_at > datetime('now')"
       );
+      const sessionResult = sessionQuery.get(token);
       
-      if (typeof sessionQuery.get === 'function') {
-        // Sync database (SQLite)
-        session = sessionQuery.get(token);
-      } else {
-        // Async database (Supabase) - try JOIN first
+      if (sessionResult && typeof sessionResult.then === 'function') {
+        // Async database (Supabase) - JOIN might not work, fallback to separate queries
         try {
-          session = await sessionQuery.get(token);
+          session = await sessionResult;
         } catch (joinError) {
-          // Fallback: query separately if JOIN doesn't work
+          // Fallback: query separately
           const sessionDataQuery = db.prepare("SELECT * FROM sessions WHERE token = ?");
-          const sessionData = typeof sessionDataQuery.get === 'function' 
-            ? sessionDataQuery.get(token)
-            : await sessionDataQuery.get(token);
+          const sessionDataResult = sessionDataQuery.get(token);
+          const sessionData = sessionDataResult && typeof sessionDataResult.then === 'function'
+            ? await sessionDataResult
+            : sessionDataResult;
             
           if (sessionData && new Date(sessionData.expires_at) > new Date()) {
             const userQuery = db.prepare("SELECT * FROM users WHERE id = ?");
-            const user = typeof userQuery.get === 'function'
-              ? userQuery.get(sessionData.user_id)
-              : await userQuery.get(sessionData.user_id);
+            const userResult = userQuery.get(sessionData.user_id);
+            const user = userResult && typeof userResult.then === 'function'
+              ? await userResult
+              : userResult;
             session = sessionData ? { ...sessionData, name: user?.name, email: user?.email } : null;
           } else {
             session = null;
           }
         }
+      } else {
+        // Sync database (SQLite)
+        session = sessionResult;
       }
     } catch (error) {
       // Fallback for in-memory database (doesn't support JOIN)
       const sessionDataQuery = db.prepare("SELECT * FROM sessions WHERE token = ?");
-      const sessionData = typeof sessionDataQuery.get === 'function'
-        ? sessionDataQuery.get(token)
-        : await sessionDataQuery.get(token);
+      const sessionDataResult = sessionDataQuery.get(token);
+      const sessionData = sessionDataResult && typeof sessionDataResult.then === 'function'
+        ? await sessionDataResult
+        : sessionDataResult;
         
       if (sessionData && new Date(sessionData.expires_at) > new Date()) {
         const userQuery = db.prepare("SELECT * FROM users WHERE id = ?");
-        const user = typeof userQuery.get === 'function'
-          ? userQuery.get(sessionData.user_id)
-          : await userQuery.get(sessionData.user_id);
+        const userResult = userQuery.get(sessionData.user_id);
+        const user = userResult && typeof userResult.then === 'function'
+          ? await userResult
+          : userResult;
         session = sessionData ? { ...sessionData, name: user?.name, email: user?.email } : null;
       } else {
         session = null;
