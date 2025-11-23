@@ -52,7 +52,16 @@ export async function POST(req) {
     ).run(user.id, token, expiresAt.toISOString());
 
     // Clean up expired sessions
-    db.prepare("DELETE FROM sessions WHERE expires_at < datetime('now')").run();
+    try {
+      db.prepare("DELETE FROM sessions WHERE expires_at < datetime('now')").run();
+    } catch (error) {
+      // For in-memory database, manually clean up expired sessions
+      if (memoryDb && memoryDb.sessions) {
+        memoryDb.sessions = memoryDb.sessions.filter(
+          s => new Date(s.expires_at) > new Date()
+        );
+      }
+    }
 
     console.log("Session created for user:", user.id);
 
